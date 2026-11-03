@@ -1,4 +1,10 @@
-"""Fase única, portal e sistema de partículas."""
+"""Fases, portal e sistema de partículas.
+
+Cada fase é um dicionário em LEVELS. Plataformas: (x, y, largura, altura, dimensão)
+  dimensão = N (neutra, sempre sólida), B (azul) ou P (roxa).
+"platforms" = caminho principal, em ordem. "blockers" = plataformas extras que
+atrapalham (ex.: tetos que bloqueiam a troca de dimensão).
+"""
 import math
 import random
 
@@ -6,6 +12,91 @@ import pygame
 
 from platforms import Platform
 from settings import *
+
+N, B, P = None, BLUE, PURPLE
+
+LEVELS = [
+    # ---------------------------------------------------------------- FASE 1 — FÁCIL
+    {
+        "name": "DESPERTAR",
+        "difficulty": "FÁCIL",
+        "color": (120, 255, 160),
+        "hint": "Em plataformas cinzas é seguro apertar SHIFT. Troque antes de pular!",
+        "spawn": (60, 224),
+        "portal": (480, 650),
+        "platforms": [
+            (0, 260, 240, 20, N),      # início
+            (320, 300, 140, 20, N),
+            (540, 340, 140, 20, B),    # você começa na dimensão azul
+            (760, 380, 140, 20, N),    # descanse aqui e aperte SHIFT (roxo)
+            (980, 420, 140, 20, P),
+            (1160, 480, 110, 20, N),   # descanse aqui e aperte SHIFT (azul)
+            (1000, 540, 130, 20, B),
+            (820, 580, 130, 20, N),    # descanse aqui e aperte SHIFT (roxo)
+            (640, 620, 130, 20, P),
+            (380, 650, 200, 20, N),    # saída
+        ],
+        "blockers": [],
+    },
+    # ---------------------------------------------------------------- FASE 2 — MÉDIO
+    {
+        "name": "ECOS",
+        "difficulty": "MÉDIO",
+        "color": (255, 200, 90),
+        "hint": "Troque de dimensão NO AR. Cuidado: o teto roxo bloqueia a troca.",
+        "spawn": (50, 604),
+        "portal": (100, 330),
+        "platforms": [
+            (0, 640, 220, 80, N),
+            (290, 590, 90, 20, B),
+            (450, 540, 90, 20, P),
+            (610, 490, 90, 20, B),
+            (790, 450, 90, 20, P),
+            (950, 400, 90, 20, B),
+            (1110, 350, 90, 20, P),
+            (950, 290, 90, 20, B),
+            (790, 240, 90, 20, P),
+            (630, 190, 90, 20, B),
+            (470, 240, 90, 20, P),
+            (310, 290, 90, 20, B),
+            (0, 330, 200, 20, N),
+        ],
+        "blockers": [
+            (590, 390, 130, 20, P),    # teto roxo sobre a 3ª plataforma
+        ],
+    },
+    # ---------------------------------------------------------------- FASE 3 — DIFÍCIL
+    {
+        "name": "O ÚLTIMO ECO",
+        "difficulty": "DIFÍCIL",
+        "color": (255, 90, 100),
+        "hint": "Plataformas da cor oposta podem bloquear a troca. Escolha o momento.",
+        "spawn": (40, 614),
+        "portal": (50, 370),
+        "platforms": [
+            (0, 650, 130, 70, N),      # troque para roxo ainda aqui (é seguro)
+            (300, 610, 60, 20, P),
+            (530, 570, 60, 20, B),
+            (760, 520, 60, 20, P),
+            (990, 470, 60, 20, B),
+            (1190, 410, 60, 20, P),
+            (1010, 330, 60, 20, B),
+            (800, 270, 60, 20, P),
+            (590, 230, 60, 20, B),
+            (390, 280, 60, 20, P),
+            (210, 320, 60, 20, B),
+            (0, 370, 100, 20, N),
+        ],
+        "blockers": [
+            (510, 460, 100, 20, P),    # teto roxo sobre a 1ª plataforma azul
+            (1170, 310, 100, 20, B),   # teto azul sobre a plataforma roxa da direita
+            (570, 120, 100, 20, P),    # teto roxo sobre a plataforma azul do topo
+            (370, 170, 100, 20, B),    # teto azul sobre a última plataforma roxa
+        ],
+    },
+]
+
+NUM_LEVELS = len(LEVELS)
 
 
 class ParticleSystem:
@@ -35,29 +126,17 @@ class ParticleSystem:
 
 
 class Level:
-    """Sala única. Para editar a fase, mexa na lista de plataformas abaixo."""
-
-    def __init__(self):
-        B, P = BLUE, PURPLE
-        self.platforms = [
-            Platform(0, 640, 280, 80),            # início (neutra)
-            Platform(350, 590, 100, 20, B),
-            Platform(520, 540, 100, 20, P),
-            Platform(690, 490, 100, 20, B),
-            Platform(680, 380, 120, 20, P),       # "teto" roxo: bloqueia a troca ao passar por baixo
-            Platform(860, 440, 100, 20, P),
-            Platform(1030, 390, 100, 20, B),
-            Platform(1160, 340, 120, 20),         # descanso (neutra)
-            Platform(1000, 280, 100, 20, P),
-            Platform(830, 230, 100, 20, B),
-            Platform(660, 180, 100, 20, P),
-            Platform(490, 230, 100, 20, B),
-            Platform(320, 280, 100, 20, P),
-            Platform(0, 330, 220, 20),            # saída (neutra)
-        ]
-        self.spawn = (60, 640 - 36)
+    def __init__(self, index=0):
+        data = LEVELS[index]
+        self.index = index
+        self.name = data["name"]
+        self.difficulty = data["difficulty"]
+        self.color = data["color"]
+        self.hint = data["hint"]
+        self.platforms = [Platform(*t) for t in data["platforms"] + data["blockers"]]
+        self.spawn = data["spawn"]
         self.portal = pygame.Rect(0, 0, 44, 72)
-        self.portal.midbottom = (110, 330)
+        self.portal.midbottom = data["portal"]
 
     def snap(self, dim):
         for p in self.platforms:
