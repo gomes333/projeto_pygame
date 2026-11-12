@@ -1,166 +1,114 @@
-"""Fases, portal e sistema de partículas.
+"""Dados das 10 fases (Python puro, sem pygame, para poder ser validado por tools/validate_levels.py).
 
-Cada fase é um dicionário em LEVELS. Plataformas: (x, y, largura, altura, dimensão)
-  dimensão = N (neutra, sempre sólida), B (azul) ou P (roxa).
-"platforms" = caminho principal, em ordem. "blockers" = plataformas extras que
-atrapalham (ex.: tetos que bloqueiam a troca de dimensão).
+Formato de cada fase:
+  name   : nome da fase
+  hint   : dica mostrada no início (dificuldade e cor são adicionadas no fim do arquivo)
+  route  : plataformas do caminho, EM ORDEM (a primeira é o início, a última é a saída)
+  extra  : plataformas extras fora do caminho (tetos etc.)
+  hazards: perigos (x, y, w, h, dimensão). Só existem (visíveis e mortais) na dimensão indicada.
+           altura <= 20 -> faixa de espinhos; altura maior -> mina flutuante.
+Cada plataforma: (x, y, largura, altura, dimensão)  — dimensão None = neutra (sempre sólida).
 """
-import math
-import random
+from settings import BLUE as B, PURPLE as P
 
-import pygame
-
-from platforms import Platform
-from settings import *
-
-N, B, P = None, BLUE, PURPLE
+N = None  # neutra
 
 LEVELS = [
-    # ---------------------------------------------------------------- FASE 1 — FÁCIL
-    {
-        "name": "DESPERTAR",
-        "difficulty": "FÁCIL",
-        "color": (120, 255, 160),
-        "hint": "Em plataformas cinzas é seguro apertar SHIFT. Troque antes de pular!",
-        "spawn": (60, 224),
-        "portal": (480, 650),
-        "platforms": [
-            (0, 260, 240, 20, N),      # início
-            (320, 300, 140, 20, N),
-            (540, 340, 140, 20, B),    # você começa na dimensão azul
-            (760, 380, 140, 20, N),    # descanse aqui e aperte SHIFT (roxo)
-            (980, 420, 140, 20, P),
-            (1160, 480, 110, 20, N),   # descanse aqui e aperte SHIFT (azul)
-            (1000, 540, 130, 20, B),
-            (820, 580, 130, 20, N),    # descanse aqui e aperte SHIFT (roxo)
-            (640, 620, 130, 20, P),
-            (380, 650, 200, 20, N),    # saída
-        ],
-        "blockers": [],
-    },
-    # ---------------------------------------------------------------- FASE 2 — MÉDIO
-    {
-        "name": "ECOS",
-        "difficulty": "MÉDIO",
-        "color": (255, 200, 90),
-        "hint": "Troque de dimensão NO AR. Cuidado: o teto roxo bloqueia a troca.",
-        "spawn": (50, 604),
-        "portal": (100, 330),
-        "platforms": [
-            (0, 640, 220, 80, N),
-            (290, 590, 90, 20, B),
-            (450, 540, 90, 20, P),
-            (610, 490, 90, 20, B),
-            (790, 450, 90, 20, P),
-            (950, 400, 90, 20, B),
-            (1110, 350, 90, 20, P),
-            (950, 290, 90, 20, B),
-            (790, 240, 90, 20, P),
-            (630, 190, 90, 20, B),
-            (470, 240, 90, 20, P),
-            (310, 290, 90, 20, B),
-            (0, 330, 200, 20, N),
-        ],
-        "blockers": [
-            (590, 390, 130, 20, P),    # teto roxo sobre a 3ª plataforma
-        ],
-    },
-    # ---------------------------------------------------------------- FASE 3 — DIFÍCIL
-    {
-        "name": "O ÚLTIMO ECO",
-        "difficulty": "DIFÍCIL",
-        "color": (255, 90, 100),
-        "hint": "Plataformas da cor oposta podem bloquear a troca. Escolha o momento.",
-        "spawn": (40, 614),
-        "portal": (50, 370),
-        "platforms": [
-            (0, 650, 130, 70, N),      # troque para roxo ainda aqui (é seguro)
-            (300, 610, 60, 20, P),
-            (530, 570, 60, 20, B),
-            (760, 520, 60, 20, P),
-            (990, 470, 60, 20, B),
-            (1190, 410, 60, 20, P),
-            (1010, 330, 60, 20, B),
-            (800, 270, 60, 20, P),
-            (590, 230, 60, 20, B),
-            (390, 280, 60, 20, P),
-            (210, 320, 60, 20, B),
-            (0, 370, 100, 20, N),
-        ],
-        "blockers": [
-            (510, 460, 100, 20, P),    # teto roxo sobre a 1ª plataforma azul
-            (1170, 310, 100, 20, B),   # teto azul sobre a plataforma roxa da direita
-            (570, 120, 100, 20, P),    # teto roxo sobre a plataforma azul do topo
-            (370, 170, 100, 20, B),    # teto azul sobre a última plataforma roxa
-        ],
-    },
+    # 1 ---------------------------------------------------------------
+    dict(name="Despertar",
+         hint="SHIFT alterna a dimensão. Troque no ar para pousar na plataforma seguinte.",
+         route=[(0, 640, 260, 80, N), (320, 610, 150, 20, B), (530, 580, 150, 20, P),
+                (740, 550, 150, 20, B), (950, 520, 150, 20, P), (1160, 490, 120, 20, N)],
+         extra=[], hazards=[]),
+    # 2 ---------------------------------------------------------------
+    dict(name="Dois Estados",
+         hint="Cada cor só existe na sua dimensão.",
+         route=[(0, 640, 200, 80, N), (290, 590, 110, 20, B), (500, 540, 110, 20, P),
+                (710, 590, 110, 20, B), (920, 540, 110, 20, P), (1120, 480, 160, 20, N),
+                (940, 410, 110, 20, B), (740, 350, 110, 20, P), (540, 300, 110, 20, B),
+                (260, 250, 180, 20, N)],
+         extra=[], hazards=[]),
+    # 3 ---------------------------------------------------------------
+    dict(name="Espinhos",
+         hint="Espinhos só são perigosos na dimensão da cor deles.",
+         route=[(0, 640, 200, 80, N), (270, 600, 420, 20, N), (770, 550, 110, 20, P),
+                (950, 500, 110, 20, B), (1120, 440, 160, 20, N), (950, 370, 110, 20, P),
+                (740, 320, 160, 20, N), (560, 270, 110, 20, B), (330, 230, 180, 20, N)],
+         extra=[],
+         hazards=[(400, 584, 140, 16, B), (780, 304, 80, 16, P)]),
+    # 4 ---------------------------------------------------------------
+    dict(name="Fenda",
+         hint="Corra para saltos longos. Solte o pulo cedo para saltos curtos.",
+         route=[(0, 640, 200, 80, N), (350, 610, 90, 20, B), (590, 590, 90, 20, P),
+                (830, 560, 90, 20, B), (1070, 520, 90, 20, P), (1190, 460, 90, 20, N),
+                (1010, 390, 90, 20, B), (790, 360, 90, 20, P), (570, 330, 90, 20, B),
+                (350, 300, 90, 20, P), (80, 260, 190, 20, N)],
+         extra=[], hazards=[]),
+    # 5 ---------------------------------------------------------------
+    dict(name="Escada",
+         hint="Atravesse a plataforma da outra cor e troque quando estiver acima dela.",
+         route=[(0, 640, 220, 80, N), (320, 610, 100, 20, B), (480, 540, 100, 20, P),
+                (480, 435, 100, 20, B), (480, 330, 100, 20, P), (480, 225, 100, 20, B),
+                (700, 200, 100, 20, P), (910, 240, 100, 20, B), (1090, 280, 190, 20, N)],
+         extra=[], hazards=[]),
+    # 6 ---------------------------------------------------------------
+    dict(name="Pulsos",
+         hint="Minas flutuantes: troque de dimensão para atravessá-las.",
+         route=[(0, 640, 200, 80, N), (330, 600, 100, 20, B), (560, 560, 200, 20, N),
+                (890, 520, 100, 20, P), (1110, 470, 170, 20, N), (940, 400, 100, 20, B),
+                (760, 360, 100, 20, P), (580, 320, 100, 20, B), (400, 280, 100, 20, P),
+                (120, 240, 180, 20, N)],
+         extra=[],
+         hazards=[(620, 544, 80, 16, P), (815, 400, 26, 26, B), (500, 215, 26, 26, B)]),
+    # 7 ---------------------------------------------------------------
+    dict(name="Tetos",
+         hint="Não dá para trocar de dimensão dentro de uma plataforma.",
+         route=[(0, 640, 200, 80, N), (320, 600, 100, 20, B), (540, 570, 100, 20, P),
+                (760, 540, 100, 20, B), (980, 500, 100, 20, P), (1160, 440, 120, 20, N),
+                (980, 360, 100, 20, B), (800, 320, 100, 20, P), (620, 280, 100, 20, B),
+                (440, 240, 100, 20, P), (200, 200, 160, 20, N)],
+         extra=[(300, 500, 190, 20, P), (520, 470, 190, 20, B), (740, 440, 190, 20, P),
+                (960, 400, 190, 20, B), (960, 250, 190, 20, P), (780, 210, 190, 20, B)],
+         hazards=[]),
+    # 8 ---------------------------------------------------------------
+    dict(name="Agulhas",
+         hint="Plataformas estreitas e saltos longos.",
+         route=[(0, 650, 150, 70, N), (300, 625, 70, 20, B), (520, 600, 70, 20, P),
+                (740, 575, 70, 20, B), (960, 550, 70, 20, P), (1170, 505, 110, 20, N),
+                (980, 420, 70, 20, B), (760, 400, 70, 20, P), (540, 380, 70, 20, B),
+                (320, 360, 70, 20, P), (100, 340, 70, 20, B), (0, 230, 90, 20, N),
+                (240, 210, 70, 20, P), (460, 190, 70, 20, B), (690, 160, 200, 20, N)],
+         extra=[],
+         hazards=[(1215, 489, 50, 16, B), (672, 300, 26, 26, P)]),
+    # 9 ---------------------------------------------------------------
+    dict(name="Torre",
+         hint="Combine escadas, saltos longos e minas.",
+         route=[(0, 650, 200, 70, N), (350, 620, 80, 20, B), (580, 570, 80, 20, P),
+                (580, 465, 80, 20, B), (580, 360, 80, 20, P), (580, 255, 80, 20, B),
+                (800, 215, 80, 20, P), (1020, 255, 80, 20, B), (1170, 160, 110, 20, N),
+                (960, 120, 70, 20, P), (740, 100, 70, 20, B), (400, 80, 200, 20, N)],
+         extra=[],
+         hazards=[(1200, 144, 60, 16, B), (720, 150, 26, 26, B)]),
+    # 10 --------------------------------------------------------------
+    dict(name="O Último Eco",
+         hint="Tudo o que você aprendeu. Boa sorte.",
+         route=[(0, 650, 150, 70, N), (310, 630, 70, 20, B), (540, 610, 70, 20, P),
+                (770, 590, 70, 20, B), (1000, 570, 70, 20, P), (1170, 470, 110, 20, N),
+                (980, 400, 70, 20, B), (780, 380, 70, 20, P), (560, 360, 70, 20, B),
+                (340, 340, 70, 20, P), (120, 300, 110, 20, N), (280, 230, 70, 20, B),
+                (500, 200, 70, 20, P), (720, 170, 70, 20, B), (940, 140, 70, 20, P),
+                (1140, 110, 140, 20, N)],
+         extra=[],
+         hazards=[(1215, 454, 50, 16, B)]),
 ]
 
-NUM_LEVELS = len(LEVELS)
 
-
-class ParticleSystem:
-    def __init__(self):
-        self.items = []
-
-    def emit(self, x, y, color, count=10, speed=3.0, life=(20, 40), gravity=0.08,
-             size=(2, 4), angle=None, arc=math.pi * 2):
-        for _ in range(count):
-            a = random.uniform(0, math.tau) if angle is None else angle + random.uniform(-arc / 2, arc / 2)
-            s = random.uniform(0.3, 1.0) * speed
-            l = random.randint(*life)
-            self.items.append([x, y, math.cos(a) * s, math.sin(a) * s, l, l, color,
-                               random.randint(*size), gravity])
-
-    def update(self):
-        for p in self.items:
-            p[0] += p[2]
-            p[1] += p[3]
-            p[3] += p[8]
-            p[4] -= 1
-        self.items = [p for p in self.items if p[4] > 0]
-
-    def draw(self, layer):
-        for x, y, _, _, life, maxlife, color, size, _ in self.items:
-            pygame.draw.rect(layer, (*color, int(255 * life / maxlife)), (int(x), int(y), size, size))
-
-
-class Level:
-    def __init__(self, index=0):
-        data = LEVELS[index]
-        self.index = index
-        self.name = data["name"]
-        self.difficulty = data["difficulty"]
-        self.color = data["color"]
-        self.hint = data["hint"]
-        self.platforms = [Platform(*t) for t in data["platforms"] + data["blockers"]]
-        self.spawn = data["spawn"]
-        self.portal = pygame.Rect(0, 0, 44, 72)
-        self.portal.midbottom = data["portal"]
-
-    def snap(self, dim):
-        for p in self.platforms:
-            p.snap(dim)
-
-    def update(self, dim):
-        for p in self.platforms:
-            p.update(dim)
-
-    def solids(self, dim):
-        return [p.rect for p in self.platforms if p.is_solid(dim)]
-
-    def blocks(self, rect, new_dim):
-        """True se alternar para new_dim deixaria uma plataforma sólida dentro do jogador."""
-        return any(p.dimension == new_dim and rect.colliderect(p.rect) for p in self.platforms)
-
-    def draw_portal(self, surface, time):
-        cx, cy = self.portal.center
-        for i in range(6):
-            pulse = math.sin(time * 3 + i * 0.8)
-            w = self.portal.w - i * 6 + pulse * 3
-            h = self.portal.h - i * 9 + pulse * 4
-            rect = pygame.Rect(0, 0, max(4, w), max(4, h))
-            rect.center = (cx, cy)
-            t = i / 5
-            col = tuple(int(a + (255 - a) * t) for a in PORTAL_COLOR)
-            pygame.draw.ellipse(surface, col, rect, 2)
+# Rótulo de dificuldade e cor de cada fase (usados no HUD e nas telas)
+TIERS = [
+    ("MUITO FÁCIL", (120, 255, 160)), ("FÁCIL", (150, 255, 130)), ("FÁCIL", (190, 255, 110)),
+    ("MÉDIO", (240, 240, 100)), ("MÉDIO", (255, 215, 90)), ("MÉDIO", (255, 185, 80)),
+    ("DIFÍCIL", (255, 150, 80)), ("DIFÍCIL", (255, 115, 90)),
+    ("MUITO DIFÍCIL", (255, 85, 105)), ("EXTREMO", (255, 70, 200)),
+]
+for _lv, (_label, _color) in zip(LEVELS, TIERS):
+    _lv["difficulty"], _lv["color"] = _label, _color
